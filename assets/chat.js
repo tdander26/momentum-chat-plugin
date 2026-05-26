@@ -306,25 +306,32 @@
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
 			body: JSON.stringify({ messages: state.messages, session_id: state.sessionId })
 		})
-			.then(function (r) { return r.json(); })
+			.then(function (r) { return r.json().catch(function () { return { code: 'bad_response', message: 'Server returned an unreadable response (HTTP ' + r.status + ').' }; }); })
 			.then(function (data) {
 				hideTyping();
+				data = data || {};
 				if (data.code && data.message) {
-					addMessage('assistant', "Sorry — I'm not set up properly yet. (" + data.message + ") Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
+					addMessage('assistant', data.message + ' If this keeps happening, please call ' + (MomentumChat.phone || 'the office') + '.');
 					setBusy(false);
 					return;
 				}
-				if (data.reply) addMessage('assistant', data.reply);
+				if (data.reply) {
+					addMessage('assistant', data.reply);
+				}
 				if (data.tool && data.tool.action === 'fetch_slots') {
 					showTyping();
 					fetchSlots();
 				} else {
+					if (!data.reply) {
+						addMessage('assistant', "Sorry, I didn't catch a response. Could you try again? If this keeps happening, please call " + (MomentumChat.phone || 'the office') + '.');
+					}
 					setBusy(false);
 				}
 			})
-			.catch(function () {
+			.catch(function (err) {
 				hideTyping();
-				addMessage('assistant', "Sorry — I'm having trouble connecting. Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
+				if (window.console && console.error) console.error('Momentum Chat fetch error:', err);
+				addMessage('assistant', "I'm having trouble connecting right now. Please try again, or call " + (MomentumChat.phone || 'the office') + '.');
 				setBusy(false);
 			});
 	}

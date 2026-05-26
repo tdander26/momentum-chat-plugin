@@ -224,16 +224,31 @@ function momentum_chat_handle_chat( WP_REST_Request $request ) {
 			'model'       => $settings['model'] ?? 'qwen/qwen-2.5-72b-instruct',
 			'messages'    => $clean,
 			'temperature' => 0.4,
-			'max_tokens'  => 400,
+			'max_tokens'  => 600,
 		] ),
 	] );
 
 	if ( is_wp_error( $response ) ) {
-		return new WP_Error( 'upstream', 'Chat service unavailable.', [ 'status' => 502 ] );
+		error_log( 'Momentum Chat: OpenRouter request failed - ' . $response->get_error_message() );
+		return new WP_Error( 'upstream', 'Chat service unavailable. Please try again in a moment.', [ 'status' => 502 ] );
 	}
 
-	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+	$http_code = wp_remote_retrieve_response_code( $response );
+	$raw_body  = wp_remote_retrieve_body( $response );
+	$body      = json_decode( $raw_body, true );
+
+	if ( $http_code >= 400 ) {
+		$msg = $body['error']['message'] ?? "HTTP $http_code";
+		error_log( 'Momentum Chat: OpenRouter error - ' . $msg );
+		return new WP_Error( 'upstream_error', 'Chat service error: ' . $msg, [ 'status' => 502 ] );
+	}
+
 	$reply = $body['choices'][0]['message']['content'] ?? '';
+
+	if ( ! $reply ) {
+		error_log( 'Momentum Chat: empty reply from OpenRouter. Raw body: ' . substr( $raw_body, 0, 500 ) );
+		return new WP_Error( 'empty_reply', "I didn't catch a response — please try again, or call the office.", [ 'status' => 502 ] );
+	}
 
 	$tool = null;
 	if ( preg_match( '/\[TOOL\](.*?)\[\/TOOL\]/s', $reply, $matches ) ) {
