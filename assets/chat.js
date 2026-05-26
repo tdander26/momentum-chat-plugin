@@ -290,7 +290,12 @@
 	function setBusy(b) {
 		state.busy = b;
 		sendBtn.disabled = b;
-		input.disabled = b;
+		// Don't disable the input — it dismisses the mobile keyboard and forces
+		// the user to re-tap to type again. send() already gates on state.busy.
+		if (!b) {
+			// Re-focus the input after a response so they can keep typing.
+			setTimeout(function () { try { input.focus(); } catch (e) {} }, 30);
+		}
 	}
 
 	function send() {
