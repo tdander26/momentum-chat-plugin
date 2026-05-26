@@ -126,17 +126,10 @@ function momentum_chat_render_settings() {
 					</td>
 				</tr>
 				<tr>
-					<th scope="row">New patient booking type ID</th>
+					<th scope="row">Consult booking type ID</th>
 					<td>
 						<input type="number" name="momentum_chat_settings[tidycal_type_new]" value="<?php echo esc_attr( $s['tidycal_type_new'] ?? '' ); ?>">
-						<p class="description">Numeric ID of your "New Patient Consult" booking type in TidyCal.</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">Returning patient booking type ID</th>
-					<td>
-						<input type="number" name="momentum_chat_settings[tidycal_type_return]" value="<?php echo esc_attr( $s['tidycal_type_return'] ?? '' ); ?>">
-						<p class="description">Numeric ID of your "Adjustment" or returning-patient booking type.</p>
+						<p class="description">Numeric ID of your free consult booking type in TidyCal. Find it in the URL when editing the booking type (e.g. <code>/booking-types/<strong>12345</strong>/edit</code>).</p>
 					</td>
 				</tr>
 				<tr>

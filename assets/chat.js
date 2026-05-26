@@ -114,7 +114,7 @@
 		});
 	}
 
-	function addSlotButtons(slots, patientType) {
+	function addSlotButtons(slots) {
 		if (!slots.length) {
 			addMessage('assistant', "I don't see any open slots in the next two weeks. The easiest thing is to call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
 			return;
@@ -122,14 +122,14 @@
 		var wrap = el('div', { class: 'mchat-slots' });
 		slots.forEach(function (slot) {
 			var btn = el('button', { type: 'button', class: 'mchat-slot', text: slot.label });
-			btn.addEventListener('click', function () { chooseSlot(slot, patientType); });
+			btn.addEventListener('click', function () { chooseSlot(slot); });
 			wrap.appendChild(btn);
 		});
 		log.appendChild(wrap);
 		scrollLogToBottom();
 	}
 
-	function chooseSlot(slot, patientType) {
+	function chooseSlot(slot) {
 		fetch(MomentumChat.restUrl + 'booking-link', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
@@ -169,10 +169,15 @@
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				hideTyping();
+				if (data.code && data.message) {
+					addMessage('assistant', "Sorry — I'm not set up properly yet. (" + data.message + ") Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
+					setBusy(false);
+					return;
+				}
 				if (data.reply) addMessage('assistant', data.reply);
 				if (data.tool && data.tool.action === 'fetch_slots') {
 					showTyping();
-					fetchSlots(data.tool.patient_type);
+					fetchSlots();
 				} else {
 					setBusy(false);
 				}
@@ -184,20 +189,27 @@
 			});
 	}
 
-	function fetchSlots(patientType) {
+	function fetchSlots() {
 		fetch(MomentumChat.restUrl + 'slots', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
-			body: JSON.stringify({ patient_type: patientType })
+			body: JSON.stringify({})
 		})
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				hideTyping();
-				if (data.slots) addSlotButtons(data.slots, data.patient_type);
+				if (data.code && data.message) {
+					addMessage('assistant', "I can't pull up the calendar right now (" + data.message + "). Please call the office at " + (MomentumChat.phone || 'the number on our site') + " to book.");
+				} else if (data.slots) {
+					addSlotButtons(data.slots);
+				} else {
+					addMessage('assistant', "Something went wrong getting the calendar. Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
+				}
 				setBusy(false);
 			})
 			.catch(function () {
 				hideTyping();
+				addMessage('assistant', "I'm having trouble reaching the calendar. Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
 				setBusy(false);
 			});
 	}

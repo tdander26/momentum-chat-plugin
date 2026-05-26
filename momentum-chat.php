@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Momentum Chat
  * Description: AI chat assistant for Momentum Health & Wellness. Answers questions and helps patients book appointments via TidyCal.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Author: Dr. Todd Anderson
  * License: GPL-2.0+
  * GitHub Plugin URI: tdander26/momentum-chat-plugin
