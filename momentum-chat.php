@@ -5,7 +5,7 @@
  * Version: 0.2.0
  * Author: Dr. Todd Anderson
  * License: GPL-2.0+
- * GitHub Plugin URI: drtoddanderson/momentum-chat-plugin
+ * GitHub Plugin URI: tdander26/momentum-chat-plugin
  * Primary Branch: main
  * Release Asset: true
  */
