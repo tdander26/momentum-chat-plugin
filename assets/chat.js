@@ -4,10 +4,24 @@
 	var state = {
 		open: false,
 		busy: false,
-		messages: []
+		messages: [],
+		sessionId: getOrCreateSessionId()
 	};
 
 	var root, log, input, sendBtn, bubble, typingEl;
+
+	function getOrCreateSessionId() {
+		try {
+			var sid = sessionStorage.getItem('mchat_session_id');
+			if (!sid) {
+				sid = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+				sessionStorage.setItem('mchat_session_id', sid);
+			}
+			return sid;
+		} catch (e) {
+			return 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+		}
+	}
 
 	function el(tag, attrs, children) {
 		var node = document.createElement(tag);
@@ -186,7 +200,7 @@
 		fetch(MomentumChat.restUrl + 'booking-link', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
-			body: JSON.stringify({ starts_at: slot.starts_at })
+			body: JSON.stringify({ starts_at: slot.starts_at, session_id: state.sessionId })
 		})
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
@@ -218,7 +232,7 @@
 		fetch(MomentumChat.restUrl + 'chat', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
-			body: JSON.stringify({ messages: state.messages })
+			body: JSON.stringify({ messages: state.messages, session_id: state.sessionId })
 		})
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
@@ -244,7 +258,8 @@
 	}
 
 	function fetchSlots(startsAfter, moreBtn) {
-		var payload = startsAfter ? { starts_after: startsAfter } : {};
+		var payload = { session_id: state.sessionId };
+		if (startsAfter) payload.starts_after = startsAfter;
 		fetch(MomentumChat.restUrl + 'slots', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },

@@ -11,7 +11,111 @@ add_action( 'admin_menu', function () {
 		'momentum-chat',
 		'momentum_chat_render_settings'
 	);
+	add_submenu_page(
+		'options-general.php',
+		'Momentum Chat — Conversations',
+		'MC Conversations',
+		'manage_options',
+		'momentum-chat-conversations',
+		'momentum_chat_render_conversations'
+	);
 } );
+
+function momentum_chat_render_conversations() {
+	// Handle actions before render.
+	if ( isset( $_POST['momentum_chat_delete_all_transcripts'] ) && check_admin_referer( 'momentum_chat_delete_all_transcripts' ) ) {
+		update_option( 'momentum_chat_transcripts', [], false );
+		echo '<div class="notice notice-success is-dismissible"><p>All transcripts deleted.</p></div>';
+	}
+	if ( isset( $_POST['momentum_chat_delete_transcript'], $_POST['transcript_id'] ) && check_admin_referer( 'momentum_chat_delete_transcript' ) ) {
+		$id          = sanitize_text_field( $_POST['transcript_id'] );
+		$transcripts = get_option( 'momentum_chat_transcripts', [] );
+		$transcripts = array_values( array_filter( $transcripts, function ( $t ) use ( $id ) {
+			return ( $t['id'] ?? '' ) !== $id;
+		} ) );
+		update_option( 'momentum_chat_transcripts', $transcripts, false );
+		echo '<div class="notice notice-success is-dismissible"><p>Transcript deleted.</p></div>';
+	}
+
+	$transcripts = get_option( 'momentum_chat_transcripts', [] );
+	$filter      = isset( $_GET['status'] ) ? sanitize_text_field( $_GET['status'] ) : '';
+	if ( $filter ) {
+		$transcripts = array_values( array_filter( $transcripts, function ( $t ) use ( $filter ) {
+			return ( $t['status'] ?? '' ) === $filter;
+		} ) );
+	}
+
+	$status_labels = [
+		'chatted_only'    => [ 'Chatted only',     '#aaa' ],
+		'reached_slots'   => [ 'Saw times',        '#d49a3d' ],
+		'booking_clicked' => [ 'Clicked to book',  '#3fa163' ],
+	];
+
+	?>
+	<div class="wrap">
+		<h1>Momentum Chat — Conversations</h1>
+
+		<p style="background:#fff9e6;border-left:4px solid #f0c674;padding:10px 14px;margin:14px 0;font-size:13px;">
+			<strong>Privacy note:</strong> the bot itself doesn't ask for names, emails, or phone numbers — but visitors may volunteer them. Treat these transcripts the way you'd treat clinical notes. Delete anything you're uncomfortable storing.
+		</p>
+
+		<p>
+			<a href="<?php echo esc_url( admin_url( 'options-general.php?page=momentum-chat-conversations' ) ); ?>" class="button <?php echo ! $filter ? 'button-primary' : ''; ?>">All</a>
+			<?php foreach ( $status_labels as $key => $lbl ) : ?>
+				<a href="<?php echo esc_url( admin_url( 'options-general.php?page=momentum-chat-conversations&status=' . $key ) ); ?>" class="button <?php echo $filter === $key ? 'button-primary' : ''; ?>"><?php echo esc_html( $lbl[0] ); ?></a>
+			<?php endforeach; ?>
+			<form method="post" style="display:inline;margin-left:20px;">
+				<?php wp_nonce_field( 'momentum_chat_delete_all_transcripts' ); ?>
+				<button type="submit" name="momentum_chat_delete_all_transcripts" class="button" onclick="return confirm('Delete ALL transcripts? This cannot be undone.');">Delete all</button>
+			</form>
+		</p>
+
+		<?php if ( empty( $transcripts ) ) : ?>
+			<p>No conversations yet<?php echo $filter ? ' in this category' : ''; ?>.</p>
+		<?php else : ?>
+			<?php foreach ( $transcripts as $t ) :
+				$status      = $t['status'] ?? 'chatted_only';
+				$label       = $status_labels[ $status ] ?? [ $status, '#aaa' ];
+				$msgs        = $t['messages'] ?? [];
+				$started     = ! empty( $t['started_at'] ) ? wp_date( 'M j, Y g:i A', strtotime( $t['started_at'] ) ) : '';
+				$detail_id   = 'mchat-t-' . esc_attr( $t['id'] ?? wp_generate_password( 6, false ) );
+			?>
+				<div style="background:#fff;border:1px solid #e5e5e5;border-radius:6px;margin:12px 0;">
+					<div style="padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="document.getElementById('<?php echo esc_attr( $detail_id ); ?>').style.display = document.getElementById('<?php echo esc_attr( $detail_id ); ?>').style.display === 'block' ? 'none' : 'block'">
+						<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:<?php echo esc_attr( $label[1] ); ?>;"><?php echo esc_html( $label[0] ); ?></span>
+						<span style="color:#666;font-size:13px;flex:1;"><?php echo esc_html( $started ); ?> · <?php echo esc_html( count( $msgs ) ); ?> message<?php echo count( $msgs ) === 1 ? '' : 's'; ?></span>
+						<?php
+						$first_user = '';
+						foreach ( $msgs as $m ) {
+							if ( ( $m['role'] ?? '' ) === 'user' ) {
+								$first_user = mb_substr( $m['content'] ?? '', 0, 80 );
+								break;
+							}
+						}
+						?>
+						<span style="color:#999;font-style:italic;font-size:13px;flex:2;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo esc_html( $first_user ); ?></span>
+					</div>
+					<div id="<?php echo esc_attr( $detail_id ); ?>" style="display:none;border-top:1px solid #eee;padding:16px;background:#fafafa;">
+						<?php foreach ( $msgs as $m ) :
+							$role = $m['role'] ?? 'user';
+							$is_user = $role === 'user';
+							?>
+							<div style="margin-bottom:8px;display:flex;<?php echo $is_user ? 'justify-content:flex-end;' : ''; ?>">
+								<div style="max-width:75%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;<?php echo $is_user ? 'background:#3b5f7d;color:#fff;border-bottom-right-radius:4px;' : 'background:#fff;border:1px solid #e5e5e5;border-bottom-left-radius:4px;'; ?>"><?php echo nl2br( esc_html( $m['content'] ?? '' ) ); ?></div>
+							</div>
+						<?php endforeach; ?>
+						<form method="post" style="margin-top:12px;text-align:right;">
+							<?php wp_nonce_field( 'momentum_chat_delete_transcript' ); ?>
+							<input type="hidden" name="transcript_id" value="<?php echo esc_attr( $t['id'] ?? '' ); ?>">
+							<button type="submit" name="momentum_chat_delete_transcript" class="button button-small" onclick="return confirm('Delete this transcript?');">Delete this conversation</button>
+						</form>
+					</div>
+				</div>
+			<?php endforeach; ?>
+		<?php endif; ?>
+	</div>
+	<?php
+}
 
 add_action( 'admin_enqueue_scripts', function ( $hook ) {
 	if ( $hook !== 'settings_page_momentum-chat' ) {
@@ -40,6 +144,7 @@ function momentum_chat_sanitize_settings( $input ) {
 		'button_label'        => sanitize_text_field( $input['button_label'] ?? '' ),
 		'panel_title'         => sanitize_text_field( $input['panel_title'] ?? '' ),
 		'avatar_url'          => esc_url_raw( $input['avatar_url'] ?? '' ),
+		'save_transcripts'    => ! empty( $input['save_transcripts'] ) ? 1 : 0,
 		'practice_info'       => wp_kses_post( $input['practice_info'] ?? '' ),
 		'system_prompt'       => sanitize_textarea_field( $input['system_prompt'] ?? '' ),
 	];
@@ -171,6 +276,16 @@ function momentum_chat_render_settings() {
 					<td>
 						<input type="number" name="momentum_chat_settings[tidycal_type_new]" value="<?php echo esc_attr( $s['tidycal_type_new'] ?? '' ); ?>">
 						<p class="description">Numeric ID of your free consult booking type in TidyCal. Find it in the URL when editing the booking type (e.g. <code>/booking-types/<strong>12345</strong>/edit</code>).</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">Save conversation transcripts</th>
+					<td>
+						<label>
+							<input type="checkbox" name="momentum_chat_settings[save_transcripts]" value="1" <?php checked( ! isset( $s['save_transcripts'] ) || ! empty( $s['save_transcripts'] ) ); ?>>
+							Store the last 100 chats so you can review them
+						</label>
+						<p class="description">View at <a href="<?php echo esc_url( admin_url( 'options-general.php?page=momentum-chat-conversations' ) ); ?>">MC Conversations</a>. The bot never asks for names/emails/phones, but visitors may volunteer info. Treat transcripts the way you would clinical notes. Uncheck to disable storing entirely.</p>
 					</td>
 				</tr>
 				<tr>

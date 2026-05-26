@@ -29,6 +29,81 @@ add_action( 'rest_api_init', function () {
 	] );
 } );
 
+function momentum_chat_save_transcript_message( $session_id, $role, $content ) {
+	if ( ! $session_id ) {
+		return;
+	}
+	$settings = get_option( 'momentum_chat_settings', [] );
+	if ( empty( $settings['save_transcripts'] ) && ! isset( $settings['save_transcripts'] ) ) {
+		// Setting not yet saved: default ON.
+	}
+	if ( isset( $settings['save_transcripts'] ) && ! $settings['save_transcripts'] ) {
+		return;
+	}
+
+	$transcripts = get_option( 'momentum_chat_transcripts', [] );
+	$now         = gmdate( 'c' );
+
+	$found_index = null;
+	foreach ( $transcripts as $i => $t ) {
+		if ( isset( $t['id'] ) && $t['id'] === $session_id ) {
+			$found_index = $i;
+			break;
+		}
+	}
+
+	$message = [
+		'role'    => $role,
+		'content' => mb_substr( (string) $content, 0, 2000 ),
+		'at'      => $now,
+	];
+
+	if ( $found_index === null ) {
+		$transcript = [
+			'id'         => $session_id,
+			'started_at' => $now,
+			'updated_at' => $now,
+			'status'     => 'chatted_only',
+			'messages'   => [ $message ],
+		];
+		array_unshift( $transcripts, $transcript );
+	} else {
+		$transcripts[ $found_index ]['messages'][]  = $message;
+		$transcripts[ $found_index ]['updated_at']  = $now;
+		// Cap per-conversation messages at 40.
+		if ( count( $transcripts[ $found_index ]['messages'] ) > 40 ) {
+			$transcripts[ $found_index ]['messages'] = array_slice( $transcripts[ $found_index ]['messages'], -40 );
+		}
+		// Move the updated transcript to the top.
+		$updated = $transcripts[ $found_index ];
+		array_splice( $transcripts, $found_index, 1 );
+		array_unshift( $transcripts, $updated );
+	}
+
+	// Cap total at 100.
+	$transcripts = array_slice( $transcripts, 0, 100 );
+	update_option( 'momentum_chat_transcripts', $transcripts, false );
+}
+
+function momentum_chat_update_transcript_status( $session_id, $new_status ) {
+	if ( ! $session_id ) {
+		return;
+	}
+	$rank = [ 'chatted_only' => 1, 'reached_slots' => 2, 'booking_clicked' => 3 ];
+	$transcripts = get_option( 'momentum_chat_transcripts', [] );
+	foreach ( $transcripts as $i => $t ) {
+		if ( isset( $t['id'] ) && $t['id'] === $session_id ) {
+			$current = $transcripts[ $i ]['status'] ?? 'chatted_only';
+			// Only upgrade status, never downgrade.
+			if ( ( $rank[ $new_status ] ?? 0 ) > ( $rank[ $current ] ?? 0 ) ) {
+				$transcripts[ $i ]['status'] = $new_status;
+				update_option( 'momentum_chat_transcripts', $transcripts, false );
+			}
+			return;
+		}
+	}
+}
+
 function momentum_chat_handle_track( WP_REST_Request $request ) {
 	$event = $request->get_param( 'event' );
 	$allowed = [ 'open', 'slots_shown', 'booking_click' ];
@@ -169,6 +244,16 @@ function momentum_chat_handle_chat( WP_REST_Request $request ) {
 		$reply = trim( preg_replace( '/\[TOOL\].*?\[\/TOOL\]/s', '', $reply ) );
 	}
 
+	// Log the latest user message + the assistant's reply.
+	$session_id   = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	$last_user    = end( $clean );
+	if ( $session_id && $last_user && $last_user['role'] === 'user' ) {
+		momentum_chat_save_transcript_message( $session_id, 'user', $last_user['content'] );
+	}
+	if ( $session_id && $reply ) {
+		momentum_chat_save_transcript_message( $session_id, 'assistant', $reply );
+	}
+
 	return [
 		'reply' => $reply,
 		'tool'  => $tool,
@@ -244,6 +329,11 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 		];
 	}
 
+	if ( ! empty( $out ) ) {
+		$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+		momentum_chat_update_transcript_status( $session_id, 'reached_slots' );
+	}
+
 	return [
 		'slots'    => $out,
 		'has_more' => $has_more,
@@ -267,6 +357,9 @@ function momentum_chat_handle_booking_link( WP_REST_Request $request ) {
 		'name'  => $name ?: null,
 		'email' => $email ?: null,
 	] );
+
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	momentum_chat_update_transcript_status( $session_id, 'booking_clicked' );
 
 	return [
 		'url' => add_query_arg( $args, $base ),
