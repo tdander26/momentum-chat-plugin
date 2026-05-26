@@ -172,7 +172,7 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 	}
 
 	$starts_at = gmdate( 'Y-m-d\TH:i:s\Z' );
-	$ends_at   = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( '+14 days' ) );
+	$ends_at   = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( '+21 days' ) );
 
 	$url = sprintf(
 		'https://tidycal.com/api/booking-types/%d/timeslots?starts_at=%s&ends_at=%s',
@@ -196,14 +196,24 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 	$body  = json_decode( wp_remote_retrieve_body( $response ), true );
 	$slots = $body['data'] ?? $body ?? [];
 
-	$out = [];
-	foreach ( array_slice( $slots, 0, 6 ) as $slot ) {
-		if ( isset( $slot['starts_at'] ) ) {
-			$out[] = [
-				'starts_at' => $slot['starts_at'],
-				'label'     => wp_date( 'D, M j @ g:i A', strtotime( $slot['starts_at'] ) ),
-			];
+	$wp_tz = wp_timezone();
+	$out   = [];
+	foreach ( array_slice( $slots, 0, 10 ) as $slot ) {
+		if ( ! isset( $slot['starts_at'] ) ) {
+			continue;
 		}
+		try {
+			// TidyCal returns ISO 8601 timestamps. Parse as UTC, then convert to WP's timezone.
+			$dt = new DateTime( $slot['starts_at'], new DateTimeZone( 'UTC' ) );
+			$dt->setTimezone( $wp_tz );
+			$label = $dt->format( 'D, M j @ g:i A' );
+		} catch ( Exception $e ) {
+			continue;
+		}
+		$out[] = [
+			'starts_at' => $slot['starts_at'],
+			'label'     => $label,
+		];
 	}
 
 	return [

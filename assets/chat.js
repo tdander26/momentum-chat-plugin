@@ -83,10 +83,32 @@
 		if (state.open) setTimeout(function () { input.focus(); }, 220);
 	}
 
+	function escapeHtml(s) {
+		return String(s)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	function renderText(text) {
+		var out = escapeHtml(text);
+		// Markdown links: [label](url)
+		out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_, label, url) {
+			return '<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
+		});
+		// Bare http/https URLs (skip ones already inside an href)
+		out = out.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, function (_, pre, url) {
+			return pre + '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+		});
+		return out;
+	}
+
 	function addMessage(role, text) {
 		state.messages.push({ role: role, content: text });
 		var msg = el('div', { class: 'mchat-msg mchat-msg-' + role });
-		msg.textContent = text;
+		msg.innerHTML = renderText(text);
 		log.appendChild(msg);
 		scrollLogToBottom();
 	}
