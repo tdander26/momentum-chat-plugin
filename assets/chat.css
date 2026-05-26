@@ -303,6 +303,27 @@
 	transform: translateX(2px);
 }
 
+.mchat-slot-more {
+	background: transparent;
+	border-style: dashed;
+	color: var(--mchat-text-muted);
+	font-weight: 600;
+	margin-top: 2px;
+	text-align: center;
+}
+
+.mchat-slot-more:hover {
+	background: var(--mchat-bg);
+	border-color: var(--mchat-primary);
+	color: var(--mchat-primary);
+	transform: none;
+}
+
+.mchat-slot-more:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
+
 .mchat-cta {
 	display: inline-flex;
 	align-items: center;

@@ -136,9 +136,9 @@
 		});
 	}
 
-	function addSlotButtons(slots) {
+	function addSlotButtons(slots, hasMore) {
 		if (!slots.length) {
-			addMessage('assistant', "I don't see any open slots in the next two weeks. The easiest thing is to call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
+			addMessage('assistant', "I don't see any open slots in the next few weeks. The easiest thing is to call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
 			return;
 		}
 		var wrap = el('div', { class: 'mchat-slots' });
@@ -147,6 +147,17 @@
 			btn.addEventListener('click', function () { chooseSlot(slot); });
 			wrap.appendChild(btn);
 		});
+		if (hasMore) {
+			var lastStartsAt = slots[slots.length - 1].starts_at;
+			var moreBtn = el('button', { type: 'button', class: 'mchat-slot mchat-slot-more', text: 'Show more times →' });
+			moreBtn.addEventListener('click', function () {
+				moreBtn.disabled = true;
+				moreBtn.textContent = 'Loading more times…';
+				showTyping();
+				fetchSlots(lastStartsAt, moreBtn);
+			});
+			wrap.appendChild(moreBtn);
+		}
 		log.appendChild(wrap);
 		scrollLogToBottom();
 	}
@@ -211,19 +222,23 @@
 			});
 	}
 
-	function fetchSlots() {
+	function fetchSlots(startsAfter, moreBtn) {
+		var payload = startsAfter ? { starts_after: startsAfter } : {};
 		fetch(MomentumChat.restUrl + 'slots', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
-			body: JSON.stringify({})
+			body: JSON.stringify(payload)
 		})
 			.then(function (r) { return r.json(); })
 			.then(function (data) {
 				hideTyping();
+				if (moreBtn && moreBtn.parentNode) moreBtn.parentNode.removeChild(moreBtn);
 				if (data.code && data.message) {
 					addMessage('assistant', "I can't pull up the calendar right now (" + data.message + "). Please call the office at " + (MomentumChat.phone || 'the number on our site') + " to book.");
-				} else if (data.slots) {
-					addSlotButtons(data.slots);
+				} else if (data.slots && data.slots.length) {
+					addSlotButtons(data.slots, !!data.has_more);
+				} else if (startsAfter) {
+					addMessage('assistant', "Those are all the open times I see right now. Want to call the office at " + (MomentumChat.phone || 'the number on our site') + " to find something further out?");
 				} else {
 					addMessage('assistant', "Something went wrong getting the calendar. Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
 				}
@@ -231,6 +246,7 @@
 			})
 			.catch(function () {
 				hideTyping();
+				if (moreBtn && moreBtn.parentNode) moreBtn.parentNode.removeChild(moreBtn);
 				addMessage('assistant', "I'm having trouble reaching the calendar. Please call the office at " + (MomentumChat.phone || 'the number on our site') + ".");
 				setBusy(false);
 			});

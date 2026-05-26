@@ -171,8 +171,14 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 		return new WP_Error( 'no_type', 'Consult booking type not configured.', [ 'status' => 500 ] );
 	}
 
-	$starts_at = gmdate( 'Y-m-d\TH:i:s\Z' );
-	$ends_at   = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( '+21 days' ) );
+	$starts_after = $request->get_param( 'starts_after' );
+	if ( $starts_after && strtotime( $starts_after ) ) {
+		// Page forward: start from 1 minute after the last shown slot to avoid duplicates.
+		$starts_at = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $starts_after ) + 60 );
+	} else {
+		$starts_at = gmdate( 'Y-m-d\TH:i:s\Z' );
+	}
+	$ends_at = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( '+45 days' ) );
 
 	$url = sprintf(
 		'https://tidycal.com/api/booking-types/%d/timeslots?starts_at=%s&ends_at=%s',
@@ -196,8 +202,9 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 	$body  = json_decode( wp_remote_retrieve_body( $response ), true );
 	$slots = $body['data'] ?? $body ?? [];
 
-	$wp_tz = wp_timezone();
-	$out   = [];
+	$wp_tz    = wp_timezone();
+	$out      = [];
+	$has_more = count( $slots ) > 10;
 	foreach ( array_slice( $slots, 0, 10 ) as $slot ) {
 		if ( ! isset( $slot['starts_at'] ) ) {
 			continue;
@@ -217,7 +224,8 @@ function momentum_chat_handle_slots( WP_REST_Request $request ) {
 	}
 
 	return [
-		'slots' => $out,
+		'slots'    => $out,
+		'has_more' => $has_more,
 	];
 }
 
