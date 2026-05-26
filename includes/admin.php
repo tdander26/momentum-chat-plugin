@@ -145,6 +145,9 @@ function momentum_chat_sanitize_settings( $input ) {
 		'panel_title'         => sanitize_text_field( $input['panel_title'] ?? '' ),
 		'avatar_url'          => esc_url_raw( $input['avatar_url'] ?? '' ),
 		'save_transcripts'    => ! empty( $input['save_transcripts'] ) ? 1 : 0,
+		'quick_replies'       => sanitize_textarea_field( $input['quick_replies'] ?? '' ),
+		'popout_text'         => sanitize_text_field( $input['popout_text'] ?? '' ),
+		'popout_delay'        => max( 0, min( 120, (int) ( $input['popout_delay'] ?? 8 ) ) ),
 		'practice_info'       => wp_kses_post( $input['practice_info'] ?? '' ),
 		'system_prompt'       => sanitize_textarea_field( $input['system_prompt'] ?? '' ),
 	];
@@ -355,6 +358,23 @@ function momentum_chat_render_settings() {
 					<th scope="row">Greeting message</th>
 					<td>
 						<textarea name="momentum_chat_settings[greeting]" rows="2" class="large-text"><?php echo esc_textarea( $s['greeting'] ?? '' ); ?></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">Quick reply buttons</th>
+					<td>
+						<textarea name="momentum_chat_settings[quick_replies]" rows="5" class="large-text code" placeholder="Book a free consult | I'd like to book a free consult&#10;Existing patient | I'm an existing patient&#10;What do you offer? | What services do you offer?&#10;Hours &amp; location | What are your hours and location?"><?php echo esc_textarea( $s['quick_replies'] ?? "Book a free consult | I'd like to book a free consult\nExisting patient | I'm an existing patient\nWhat do you offer? | What services do you offer?\nHours & location | What are your hours and location?" ); ?></textarea>
+						<p class="description">Shown as tappable chips under the greeting so visitors don't have to type. One per line, format: <code>Button label | Message that gets sent</code>. Leave blank to hide.</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">Attention pop-out</th>
+					<td>
+						<input type="text" class="regular-text" name="momentum_chat_settings[popout_text]" value="<?php echo esc_attr( $s['popout_text'] ?? '👋 Free 15-min consult available!' ); ?>">
+						<p class="description">Short message that pops up next to the bubble after a delay. Leave blank to disable.</p>
+						<br>
+						<label>Show after <input type="number" min="0" max="120" name="momentum_chat_settings[popout_delay]" value="<?php echo esc_attr( $s['popout_delay'] ?? 8 ); ?>" style="width:70px;"> seconds</label>
+						<p class="description">Pop-out appears once per browser session, then auto-dismisses. Recommended 5–15 seconds.</p>
 					</td>
 				</tr>
 				<tr>

@@ -87,6 +87,77 @@
 		document.body.appendChild(root);
 
 		addMessage('assistant', MomentumChat.greeting);
+		renderQuickReplies();
+		schedulePopout();
+	}
+
+	function renderQuickReplies() {
+		var replies = MomentumChat.quickReplies || [];
+		if (!replies.length) return;
+		var wrap = el('div', { class: 'mchat-quick-replies' });
+		replies.forEach(function (qr) {
+			var btn = el('button', { type: 'button', class: 'mchat-quick-reply', text: qr.label });
+			btn.addEventListener('click', function () {
+				// Remove the whole row once one is tapped.
+				if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+				input.value = qr.message;
+				send();
+			});
+			wrap.appendChild(btn);
+		});
+		log.appendChild(wrap);
+		scrollLogToBottom();
+	}
+
+	var popoutEl;
+	function schedulePopout() {
+		var text = (MomentumChat.popoutText || '').trim();
+		var delay = Math.max(0, MomentumChat.popoutDelay || 0) * 1000;
+		if (!text || delay === 0) return;
+		try {
+			if (sessionStorage.getItem('mchat_popout_dismissed')) return;
+			if (sessionStorage.getItem('mchat_opened')) return;
+		} catch (e) { /* ignore */ }
+		setTimeout(function () {
+			if (state.open) return;
+			showPopout(text);
+		}, delay);
+	}
+
+	function showPopout(text) {
+		popoutEl = el('div', { class: 'mchat-popout', role: 'button', 'aria-label': 'Open chat: ' + text });
+		var msg = el('span', { class: 'mchat-popout-text', text: text });
+		var close = el('button', { class: 'mchat-popout-close', 'aria-label': 'Dismiss', text: '×' });
+		close.addEventListener('click', function (e) {
+			e.stopPropagation();
+			dismissPopout();
+		});
+		popoutEl.appendChild(msg);
+		popoutEl.appendChild(close);
+		popoutEl.addEventListener('click', function () {
+			dismissPopout();
+			if (!state.open) toggle();
+		});
+		document.body.appendChild(popoutEl);
+		// Trigger entrance animation.
+		requestAnimationFrame(function () {
+			popoutEl.classList.add('mchat-popout-visible');
+		});
+		// Auto-dismiss after 25s if untouched.
+		setTimeout(function () {
+			if (popoutEl) dismissPopout();
+		}, 25000);
+	}
+
+	function dismissPopout() {
+		if (!popoutEl) return;
+		popoutEl.classList.remove('mchat-popout-visible');
+		try { sessionStorage.setItem('mchat_popout_dismissed', '1'); } catch (e) { /* ignore */ }
+		var el2 = popoutEl;
+		popoutEl = null;
+		setTimeout(function () {
+			if (el2.parentNode) el2.parentNode.removeChild(el2);
+		}, 250);
 	}
 
 	function toggle() {
@@ -95,6 +166,7 @@
 		root.classList.toggle('mchat-open', state.open);
 		bubble.classList.toggle('mchat-bubble-open', state.open);
 		if (state.open) {
+			if (popoutEl) dismissPopout();
 			setTimeout(function () { input.focus(); }, 220);
 			// Track the first open per browser session.
 			try {

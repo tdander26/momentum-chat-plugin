@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Momentum Chat
  * Description: AI chat assistant for Momentum Health & Wellness. Answers questions and helps patients book appointments via TidyCal.
- * Version: 0.2.6
+ * Version: 0.2.7
  * Author: Dr. Todd Anderson
  * License: GPL-2.0+
  * GitHub Plugin URI: tdander26/momentum-chat-plugin
@@ -19,6 +19,25 @@ define( 'MOMENTUM_CHAT_URL', plugin_dir_url( __FILE__ ) );
 
 require_once MOMENTUM_CHAT_PATH . 'includes/admin.php';
 require_once MOMENTUM_CHAT_PATH . 'includes/api.php';
+
+function momentum_chat_parse_quick_replies( $raw ) {
+	$out = [];
+	if ( ! $raw ) {
+		return $out;
+	}
+	$lines = preg_split( '/\r?\n/', $raw );
+	foreach ( $lines as $line ) {
+		$line = trim( $line );
+		if ( ! $line || strpos( $line, '|' ) === false ) {
+			continue;
+		}
+		list( $label, $message ) = array_map( 'trim', explode( '|', $line, 2 ) );
+		if ( $label && $message ) {
+			$out[] = [ 'label' => $label, 'message' => $message ];
+		}
+	}
+	return array_slice( $out, 0, 6 );
+}
 
 add_action( 'wp_enqueue_scripts', function () {
 	$settings = get_option( 'momentum_chat_settings', [] );
@@ -49,6 +68,9 @@ add_action( 'wp_enqueue_scripts', function () {
 		'buttonLabel' => $settings['button_label'] ?? 'Schedule',
 		'panelTitle'  => $settings['panel_title'] ?? 'Scheduling Assistant',
 		'avatarUrl'   => $settings['avatar_url'] ?? '',
+		'quickReplies' => momentum_chat_parse_quick_replies( $settings['quick_replies'] ?? '' ),
+		'popoutText'   => $settings['popout_text'] ?? '',
+		'popoutDelay'  => isset( $settings['popout_delay'] ) ? (int) $settings['popout_delay'] : 8,
 		'disclaimer'  => 'Not medical advice. For urgent concerns, call the office.',
 	] );
 } );
