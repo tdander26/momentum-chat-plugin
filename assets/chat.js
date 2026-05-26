@@ -69,8 +69,8 @@
 
 		var form = el('form', { class: 'mchat-form' });
 		input = el('input', { type: 'text', class: 'mchat-input', placeholder: 'Type a message…', autocomplete: 'off', 'aria-label': 'Message' });
-		sendBtn = el('button', { type: 'submit', class: 'mchat-send', 'aria-label': 'Send message' });
-		sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+		sendBtn = el('button', { type: 'submit', class: 'mchat-send', 'aria-label': 'Send message', title: 'Send' });
+		sendBtn.textContent = 'Send';
 		form.appendChild(input);
 		form.appendChild(sendBtn);
 		form.addEventListener('submit', function (e) {
