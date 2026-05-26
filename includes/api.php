@@ -21,7 +21,28 @@ add_action( 'rest_api_init', function () {
 		'callback'            => 'momentum_chat_handle_booking_link',
 		'permission_callback' => '__return_true',
 	] );
+
+	register_rest_route( 'momentum-chat/v1', '/track', [
+		'methods'             => 'POST',
+		'callback'            => 'momentum_chat_handle_track',
+		'permission_callback' => '__return_true',
+	] );
 } );
+
+function momentum_chat_handle_track( WP_REST_Request $request ) {
+	$event = $request->get_param( 'event' );
+	$allowed = [ 'open', 'slots_shown', 'booking_click' ];
+	if ( ! in_array( $event, $allowed, true ) ) {
+		return [ 'ok' => false ];
+	}
+	$stats = get_option( 'momentum_chat_stats', [] );
+	if ( empty( $stats['since'] ) ) {
+		$stats['since'] = gmdate( 'Y-m-d' );
+	}
+	$stats[ $event ] = ( $stats[ $event ] ?? 0 ) + 1;
+	update_option( 'momentum_chat_stats', $stats, false );
+	return [ 'ok' => true ];
+}
 
 function momentum_chat_rate_limit() {
 	$ip  = $_SERVER['REMOTE_ADDR'] ?? 'unknown';

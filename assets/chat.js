@@ -80,7 +80,27 @@
 		root.setAttribute('aria-hidden', state.open ? 'false' : 'true');
 		root.classList.toggle('mchat-open', state.open);
 		bubble.classList.toggle('mchat-bubble-open', state.open);
-		if (state.open) setTimeout(function () { input.focus(); }, 220);
+		if (state.open) {
+			setTimeout(function () { input.focus(); }, 220);
+			// Track the first open per browser session.
+			try {
+				if (!sessionStorage.getItem('mchat_opened')) {
+					sessionStorage.setItem('mchat_opened', '1');
+					track('open');
+				}
+			} catch (e) { /* sessionStorage may be blocked */ }
+		}
+	}
+
+	function track(event) {
+		try {
+			fetch(MomentumChat.restUrl + 'track', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': MomentumChat.nonce },
+				body: JSON.stringify({ event: event }),
+				keepalive: true
+			});
+		} catch (e) { /* fire and forget */ }
 	}
 
 	function escapeHtml(s) {
@@ -174,6 +194,7 @@
 					addMessage('assistant', "Perfect — " + slot.label + ". One last step:");
 					var link = el('a', { href: data.url, target: '_blank', rel: 'noopener', class: 'mchat-cta' });
 					link.innerHTML = 'Confirm appointment <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
+					link.addEventListener('click', function () { track('booking_click'); });
 					log.appendChild(link);
 					scrollLogToBottom();
 				}
@@ -236,6 +257,7 @@
 				if (data.code && data.message) {
 					addMessage('assistant', "I can't pull up the calendar right now (" + data.message + "). Please call the office at " + (MomentumChat.phone || 'the number on our site') + " to book.");
 				} else if (data.slots && data.slots.length) {
+					if (!startsAfter) track('slots_shown');
 					addSlotButtons(data.slots, !!data.has_more);
 				} else if (startsAfter) {
 					addMessage('assistant', "Those are all the open times I see right now. Want to call the office at " + (MomentumChat.phone || 'the number on our site') + " to find something further out?");

@@ -81,10 +81,51 @@ INFO;
 }
 
 function momentum_chat_render_settings() {
-	$s = get_option( 'momentum_chat_settings', [] );
+	// Handle counter reset before we render anything.
+	if ( isset( $_POST['momentum_chat_reset_stats'] ) && check_admin_referer( 'momentum_chat_reset_stats' ) ) {
+		update_option( 'momentum_chat_stats', [ 'since' => gmdate( 'Y-m-d' ) ], false );
+		echo '<div class="notice notice-success is-dismissible"><p>Usage counters reset.</p></div>';
+	}
+
+	$s     = get_option( 'momentum_chat_settings', [] );
+	$stats = get_option( 'momentum_chat_stats', [] );
+	$opens     = (int) ( $stats['open'] ?? 0 );
+	$shown     = (int) ( $stats['slots_shown'] ?? 0 );
+	$bookings  = (int) ( $stats['booking_click'] ?? 0 );
+	$since     = $stats['since'] ?? 'today';
+	$conv_rate = $opens > 0 ? round( ( $bookings / $opens ) * 100, 1 ) : 0;
 	?>
 	<div class="wrap">
 		<h1>Momentum Chat Settings</h1>
+
+		<div style="background:#fff;border:1px solid #e5e5e5;border-radius:6px;padding:16px 20px;margin:16px 0;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+			<div>
+				<div style="font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.5px;">Chats opened</div>
+				<div style="font-size:28px;font-weight:600;color:#1c2733;"><?php echo esc_html( number_format( $opens ) ); ?></div>
+			</div>
+			<div style="border-left:1px solid #eee;height:48px;"></div>
+			<div>
+				<div style="font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.5px;">Reached slot picker</div>
+				<div style="font-size:28px;font-weight:600;color:#1c2733;"><?php echo esc_html( number_format( $shown ) ); ?></div>
+			</div>
+			<div style="border-left:1px solid #eee;height:48px;"></div>
+			<div>
+				<div style="font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.5px;">Booking links clicked</div>
+				<div style="font-size:28px;font-weight:600;color:#1c2733;"><?php echo esc_html( number_format( $bookings ) ); ?></div>
+			</div>
+			<div style="border-left:1px solid #eee;height:48px;"></div>
+			<div>
+				<div style="font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.5px;">Conversion</div>
+				<div style="font-size:28px;font-weight:600;color:#1c2733;"><?php echo esc_html( $conv_rate ); ?>%</div>
+			</div>
+			<div style="flex:1;text-align:right;color:#888;font-size:12px;">
+				Since <?php echo esc_html( $since ); ?>
+				<form method="post" style="display:inline;margin-left:12px;">
+					<?php wp_nonce_field( 'momentum_chat_reset_stats' ); ?>
+					<button type="submit" name="momentum_chat_reset_stats" class="button button-small" onclick="return confirm('Reset usage counters to zero?');">Reset</button>
+				</form>
+			</div>
+		</div>
 		<form method="post" action="options.php">
 			<?php settings_fields( 'momentum_chat' ); ?>
 			<table class="form-table" role="presentation">
